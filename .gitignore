@@ -15,3 +15,5 @@ env/
 
 # macOS
 .DS_Store
+
+alembic.ini
