@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from app.auth.router import router
+from app.dependencies import get_current_user, require_role
 
 app = FastAPI(title="ShopCore:")
 
