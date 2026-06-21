@@ -1,7 +1,9 @@
 import bcrypt
 from app.users.models import User
 from sqlalchemy.orm import Session
-from app.auth.jwt import create_token
+from app.auth.jwt import create_token, verify_token
+from app.cache import blacklist_token
+from datetime import datetime, timezone
 from app.auth.schemas import RegisterRequest, LoginRequest, TokenResponse
 from fastapi import HTTPException, status
 
@@ -53,3 +55,25 @@ def login_user(db:Session, data: LoginRequest):
     token = create_token(data=token_payload)
 
     return TokenResponse(access_token=token, token_type="bearer")
+
+
+def logout_user(token: str):
+    try:
+        payload = verify_token(token)
+        exp_timestamp = payload.get("exp")
+        if not exp_timestamp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Token payload is missing expiration metadata"
+            )
+        current_timestamp = int(datetime.now(timezone.utc).timestamp())
+        expiry_seconds = exp_timestamp - current_timestamp
+        blacklist_token(token, expiry_seconds)
+        return {"message": "Successfully logged out"}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid or already expired token"
+        )

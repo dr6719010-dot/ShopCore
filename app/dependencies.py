@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends, HTTPException, status
 from app.auth.jwt import verify_token
 from app.cache import is_token_blacklisted
+from datetime import datetime, timezone
 
 
 def get_db():

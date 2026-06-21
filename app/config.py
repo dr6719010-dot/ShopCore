@@ -2,7 +2,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    REDIS_URL: str
+    UPSTASH_REDIS_URL: str
+    UPSTASH_REDIS_TOKEN: str
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
