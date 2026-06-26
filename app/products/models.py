@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, PrimaryKeyConstraint
 from sqlalchemy.sql import func
+from sqlalchemy import Numeric
 from sqlalchemy import ForeignKey
 from app.database import Base
 
@@ -17,7 +18,7 @@ class Product(Base):
     seller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
     description = Column(String, nullable=False)
-    price = Column(Float, nullable=False)
+    price = Column(Numeric(precision=10, scale=2), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
 class Stock(Base):

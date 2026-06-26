@@ -21,4 +21,5 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.customer)
     created_at = Column(DateTime, server_default=func.now())
+    cancel_reason = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)

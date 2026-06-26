@@ -19,6 +19,7 @@ from app.users import models  # noqa
 from app.users import models  # noqa
 from app.products import models  # noqa
 from app.orders import models  # noqa
+from app.payments import models  # noqa
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
