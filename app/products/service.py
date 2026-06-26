@@ -1,8 +1,33 @@
 from sqlalchemy.orm import Session
+from app.cache import redis_client
+import json
 from app.products.models import Product, Category, Stock, ProductCategory
 from app.products.schemas import ProductCreate, ProductUpdate, StockUpdate
+from app.products.schemas import ProductResponse, CategoryResponse
+from app.products.schemas import ProductResponse
 from fastapi import HTTPException, status
 from app.users.models import User
+
+CACHE_TTL = 600  # 10 minutes
+
+def invalidate_product_cache(product_id: int = None):
+    redis_client.delete("products:all")
+    redis_client.delete("categories:all")
+    if product_id:
+        redis_client.delete(f"products:{product_id}")
+
+def get_all_products(db: Session):
+    cache_key = "products:all"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+    products = db.query(Product).all()
+    serialized = [ProductResponse.model_validate(p).model_dump(mode="json") for p in products]
+    redis_client.set(cache_key, json.dumps(serialized), ex=CACHE_TTL)
+    return products
+    
+
+
 
 def create_product(db: Session, data: ProductCreate, seller_email: str):
     # 1. Get seller's integer ID from email
@@ -34,17 +59,21 @@ def create_product(db: Session, data: ProductCreate, seller_email: str):
 
     db.commit()
     db.refresh(product)
+    invalidate_product_cache()
     return product
 
 
-def get_all_products(db: Session):
-    return db.query(Product).all()
-
 
 def get_product_by_id(db: Session, product_id: int):
+    cache_key = f"products:{product_id}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    serialized = ProductResponse.model_validate(product).model_dump(mode="json")
+    redis_client.set(cache_key, json.dumps(serialized), ex=CACHE_TTL)
     return product
 
 
@@ -65,6 +94,7 @@ def update_product(db: Session, product_id: int, data: ProductUpdate, seller_ema
 
     db.commit()
     db.refresh(product)
+    invalidate_product_cache(product_id)
     return product
 
 
@@ -82,6 +112,7 @@ def delete_product(db: Session, product_id: int, seller_email: str):
     
     db.delete(product)
     db.commit()
+    invalidate_product_cache(product_id)
     return {"message": "Product deleted successfully"}
 
 
@@ -104,9 +135,16 @@ def update_stock(db: Session, product_id: int, data: StockUpdate, seller_email: 
 
 
 def get_products_by_category(db: Session, category_id: int):
-    return db.query(Product).join(ProductCategory).filter(
+    cache_key = f"products:category:{category_id}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+    products = db.query(Product).join(ProductCategory).filter(
         ProductCategory.category_id == category_id
     ).all()
+    serialized = [ProductResponse.model_validate(p).model_dump(mode="json") for p in products]
+    redis_client.set(cache_key, json.dumps(serialized), ex=CACHE_TTL)
+    return products
 
 
 def create_category(db: Session, data):
@@ -121,4 +159,11 @@ def create_category(db: Session, data):
 
 
 def get_all_categories(db: Session):
-    return db.query(Category).all()
+    cache_key = "categories:all"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+    categories = db.query(Category).all()
+    serialized = [CategoryResponse.model_validate(c).model_dump(mode="json") for c in categories]
+    redis_client.set(cache_key, json.dumps(serialized), ex=CACHE_TTL)
+    return categories
