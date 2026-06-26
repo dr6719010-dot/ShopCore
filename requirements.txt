@@ -9,3 +9,4 @@ bcrypt
 redis
 upstash_redis
 razorpay
+python-jose[cryptography]
