@@ -9,4 +9,5 @@ bcrypt
 redis
 upstash_redis
 razorpay
+pydantic[email]
 python-jose[cryptography]
