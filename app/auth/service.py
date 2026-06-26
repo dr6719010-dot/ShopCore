@@ -1,9 +1,10 @@
 import bcrypt
 from app.users.models import User
 from sqlalchemy.orm import Session
-from app.auth.jwt import create_token, verify_token
+from app.auth.jwt import create_token, create_refresh_token, verify_token
 from app.cache import blacklist_token
 from datetime import datetime, timezone
+from app.users.models import UserRole
 from app.auth.schemas import RegisterRequest, LoginRequest, TokenResponse
 from fastapi import HTTPException, status
 
@@ -19,6 +20,11 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def register_user(db: Session, data: RegisterRequest):
+    if data.role == UserRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot self-register as admin"
+        )
     existing_user = db.query(User).filter(User.email == data.email).first()
     if existing_user:
         raise HTTPException(
@@ -26,7 +32,7 @@ def register_user(db: Session, data: RegisterRequest):
             detail="Email already registered"
         )
     get_hashed_password = hash_password(data.password)
-    new_user = User(email=data.email, password_hash=get_hashed_password)
+    new_user = User(email=data.email, password_hash=get_hashed_password, role=data.role)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -49,12 +55,17 @@ def login_user(db:Session, data: LoginRequest):
         )
     
     token_payload = {
-        "sub": verify_user.email,
-        "role": verify_user.role
-        }
-    token = create_token(data=token_payload)
+    "sub": verify_user.email,
+    "role": verify_user.role
+    }
+    access_token = create_token(data=token_payload)
+    refresh_token = create_refresh_token(data=token_payload)
 
-    return TokenResponse(access_token=token, token_type="bearer")
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer"
+    )
 
 
 def logout_user(token: str):
@@ -77,3 +88,20 @@ def logout_user(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Invalid or already expired token"
         )
+    
+
+def refresh_access_token(refresh_token: str):
+    payload = verify_token(refresh_token)
+    
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type"
+        )
+    
+    new_token = create_token(data={
+        "sub": payload["sub"],
+        "role": payload["role"]
+    })
+    
+    return {"access_token": new_token, "token_type": "bearer"}
